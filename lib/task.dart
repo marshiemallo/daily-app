@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:json_serializable/json_serializable.dart';
+import 'package:json_annotation/json_annotation.dart';
 
+@JsonSerializable()
 class Task extends StatefulWidget {
   final String name;
   final DateTime? date;
   final bool status;
+  final Function(bool?)? checkboxCallback;
 
-  const Task({super.key, required this.name, this.date, required this.status});
+  const Task({super.key, required this.name, this.date, required this.status, this.checkboxCallback});
 
   factory Task.fromJson(Map<String, dynamic> json) {
     final String name = json['name'] as String;
@@ -21,6 +25,14 @@ class Task extends StatefulWidget {
     );
   }
 
+  Task copyWith({String? name, bool? status, DateTime? date}){
+    return Task(
+      name: name ?? this.name,
+      status: status ?? this.status,
+      date: date ?? this.date,
+    );
+  }
+
   @override
   State<Task> createState() => _TaskState();
 
@@ -30,6 +42,7 @@ class _TaskState extends State<Task> {
   late String name;
   late DateTime? date;
   late bool status;
+  late Function(bool?)? checkboxCallback;
 
   @override
   void initState() {
@@ -37,6 +50,7 @@ class _TaskState extends State<Task> {
     name = widget.name;
     date = widget.date;
     status = widget.status;
+    checkboxCallback = widget.checkboxCallback;
   }
 
   String _displayDate() {
@@ -92,9 +106,8 @@ class _TaskState extends State<Task> {
                     onChanged: (bool? newValue) {
                       setState(() {
                         status = newValue ?? false;
-                        // **Important:** If you need to save the change back to the database/JSON,
-                        // you would call a callback function here (e.g., widget.onStatusChanged(_isChecked))
                       });
+                      checkboxCallback;
                     },
                 )
               )

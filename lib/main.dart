@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:markdown_widget/markdown_widget.dart';
 import 'package:table_calendar/table_calendar.dart';
+import 'dart:convert';
+import 'package:json_serializable/json_serializable.dart';
 
 void main() {
   runApp(const MyApp());
@@ -58,7 +60,6 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   String? _currentDate;
-  int _counter = 0;
   int _journalMode = 0;
 
   // ###################
@@ -206,6 +207,22 @@ class _MyHomePageState extends State<MyHomePage> {
                       name: currentTask.name,
                       date: currentTask.date,
                       status: currentTask.status,
+
+                      checkboxCallback: (bool? checkboxState) {
+                        bool newState = checkboxState ?? false;
+                        int num=0;
+                        for (int i=0; i < taskList.length; i++){
+                          if(taskList[i].name == currentTask.name){
+                            num = i;
+                            break;
+                          }
+                        }
+                        setState(() {
+                          taskList[num] = taskList[num].copyWith(
+                            status: checkboxState
+                          );
+                        });
+                      }
                     );
                   },
                   separatorBuilder: (context,index) => const SizedBox(height:10),
@@ -296,8 +313,6 @@ class _MyHomePageState extends State<MyHomePage> {
       child: _showContent(),
     );
   }
-
 }
 
-// ADD TASK
 
