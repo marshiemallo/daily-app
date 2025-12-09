@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:json_serializable/json_serializable.dart';
-import 'package:json_annotation/json_annotation.dart';
 
-@JsonSerializable()
 class Task extends StatefulWidget {
   final String name;
   final DateTime? date;
@@ -24,6 +22,9 @@ class Task extends StatefulWidget {
       status: status,
     );
   }
+
+  Map<String, dynamic> toJson() => {'name': name, 'status': status, 'date': date};
+
 
   Task copyWith({String? name, bool? status, DateTime? date}){
     return Task(

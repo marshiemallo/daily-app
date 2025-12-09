@@ -5,6 +5,8 @@ import 'package:markdown_widget/markdown_widget.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'dart:convert';
 import 'package:json_serializable/json_serializable.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 
 void main() {
   runApp(const MyApp());
@@ -59,8 +61,11 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  String? _currentDate;
+  final DateTime dateToday = DateTime.now();
+  final String dateTodayString = DateFormat('MMMM d, yyyy').format(DateTime.now());
+  String? _currentDate; // DateFormat('MMMM d, yyyy')
   int _journalMode = 0;
+  bool editable = true; // Set to false if it's not the current day
 
   // ###################
   // ##### Journal #####
@@ -289,6 +294,18 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
+  Future<String> get _localPath async {
+    final directory = await getApplicationDocumentsDirectory();
+    return directory.path;
+  }
+
+  Future<File> _getDayFile(DateTime date) async {
+    var day = DateFormat('yyyy-mm-dd').format(date);
+    // change _currentDate into yyyy-mm-dd,
+    final path = await _localPath;
+    return File('$path/$day.json');
+  }
+
   Widget _buildEditor() {
     return Container(
       padding: const EdgeInsets.all(16.0),
@@ -312,6 +329,21 @@ class _MyHomePageState extends State<MyHomePage> {
       padding: const EdgeInsets.all(16.0),
       child: _showContent(),
     );
+  }
+
+  void saveDay() async {
+    final Map<String, dynamic> dayData = {
+      'journal': _markdownController.text,
+      'tasks': taskList.map((task) => task.toJson()).toList(),
+      'date': _currentDate,
+    };
+    String jsonString = jsonEncode(dayData);
+    final file = await _getDayFile(DateTime.now());
+    await file.writeAsString(jsonString);
+  }
+
+  void loadDay() async {
+    // using path provider, somehow.
   }
 }
 
