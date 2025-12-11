@@ -35,12 +35,10 @@ class MyHomePage extends StatefulWidget {
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
-  final DateTime dateToday = DateTime.now();
-  final String dateTodayString = DateFormat('MMMM d, yyyy').format(DateTime.now());
+class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
+  final DateTime dateToday = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
 
-  DateTime _currentDate = DateTime.now(); // Used as a reference for the currently selected date
-  String _currentDateString = DateFormat('MMMM d, yyyy').format(DateTime.now());
+  DateTime _currentDate = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day); // Used as a reference for the currently selected date
 
   int _journalMode = 0; // Toggle for journal mode (0 = editor, 1 = preview)
   bool editable = true; // Set to false if it's not the current day
@@ -63,8 +61,28 @@ class _MyHomePageState extends State<MyHomePage> {
   void initState() {
     super.initState();
     _markdownController.addListener(_updateContent);
+    WidgetsBinding.instance!.addObserver(this);
+    loadCurrentDay();
+  }
 
-    // TaskList Initialization
+  @override void didChangeAppLifecycleState(AppLifecycleState state) {
+    switch(state) {
+      case AppLifecycleState.resumed:
+      // widget is resumed
+        break;
+      case AppLifecycleState.inactive:
+      // widget is inactive
+        break;
+      case AppLifecycleState.paused:
+      saveDay();
+        break;
+      case AppLifecycleState.detached:
+      saveDay();
+        break;
+      case AppLifecycleState.hidden:
+
+        break;
+    }
   }
 
   void _updateContent() {
@@ -114,9 +132,10 @@ class _MyHomePageState extends State<MyHomePage> {
   // #### TO-DO LIST ####
   // ####################
   List<Task> taskList = [
-    Task(name: "Insert Task Name", date: DateTime(2025, 12, 12),  status: false),
-    Task(name: "Insert Perm Task", status: true),
-    Task(name: "Work on that long project", date: DateTime(2025, 12, 10), status: false),
+    // for Testing
+    // Task(name: "Insert Task Name", date: DateTime(2025, 12, 12),  status: false),
+    // Task(name: "Insert Perm Task", status: true),
+    // Task(name: "Work on that long project", date: DateTime(2025, 12, 10), status: false),
   ];
   
   
@@ -124,17 +143,17 @@ class _MyHomePageState extends State<MyHomePage> {
   // ##### CALENDAR #####
   // ####################
   DateTime _focusedDay = DateTime.now();
-  DateTime? _selectedDay;
+  DateTime _selectedDay = DateTime.now();
 
   void _onDayTapped(DateTime selectedDay, DateTime focusedDay) {
+    saveDay(); // save before changing _currentDate
     setState(() {
-      _selectedDay = selectedDay;
-      _focusedDay = selectedDay;
-      _currentDate = selectedDay;
-      _currentDateString = DateFormat('MMMM d, yyyy').format(selectedDay);
+      _selectedDay = DateTime(selectedDay.year, selectedDay.month, selectedDay.day);
+      _focusedDay = DateTime(selectedDay.year, selectedDay.month, selectedDay.day);
+      _currentDate = DateTime(selectedDay.year, selectedDay.month, selectedDay.day);
     });
-    saveDay();
-    loadDay(selectedDay);
+    final now = DateTime.now();
+    loadDay(_selectedDay);
     _handleDaySelection(selectedDay); // unused
   }
 
@@ -142,7 +161,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Selected day: ${day.day}/${day.month}/${day.year}'),
+        content: Text('Selected day: ${day.month}/${day.day}/${day.year}'),
         duration: const Duration(milliseconds: 1500),
       )
     );
@@ -157,7 +176,7 @@ class _MyHomePageState extends State<MyHomePage> {
           appBar: AppBar(
             backgroundColor: Theme.of(context).colorScheme.inversePrimary,
             title: Center(
-                child: Text(_currentDateString)
+                child: Text(DateFormat('MMMM d, yyyy').format(_currentDate))
             ),
             bottom: const TabBar(
               tabs: [
@@ -196,7 +215,6 @@ class _MyHomePageState extends State<MyHomePage> {
                       name: currentTask.name,
                       date: currentTask.date,
                       status: currentTask.status,
-
                       checkboxCallback: (bool? checkboxState) {
                         bool newState = checkboxState ?? false;
                         int num=0;
@@ -211,7 +229,14 @@ class _MyHomePageState extends State<MyHomePage> {
                             status: checkboxState
                           );
                         });
-                      }
+                      },
+                      deleteCallback: () {
+                      setState(() {
+                        setState(() {
+                          taskList.removeAt(index);
+                        });
+                      });
+                    }
                     );
                   },
                   separatorBuilder: (context,index) => const SizedBox(height:10),
@@ -239,7 +264,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   child: TableCalendar(
                     // --- Configuration ---
                     focusedDay: _focusedDay,
-                    firstDay: DateTime.utc(2020, 1, 1), // Start of the calendar range
+                    firstDay: DateTime(2020, 1, 1), // Start of the calendar range
                     lastDay: DateTime.now(), // End of the calendar range
                     calendarFormat: CalendarFormat.month, // Show month view
                     headerStyle: const HeaderStyle(
@@ -309,7 +334,7 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Future<File> _getDayFile(DateTime date) async {
-    var day = DateFormat('yyyy-mm-dd').format(date);
+    var day = DateFormat('yyyy-MM-dd').format(date);
     final path = await _localPath;
     return File('$path/daily-$day.json');
   }
@@ -318,7 +343,7 @@ class _MyHomePageState extends State<MyHomePage> {
     final Map<String, dynamic> dayData = {
       'journal': _markdownController.text,
       'tasks': taskList.map((task) => task.toJson()).toList(),
-      'date': DateFormat('yyyy-mm-dd').format(_currentDate),
+      'date': DateFormat('yyyy-MM-dd').format(_currentDate),
     };
     String jsonString = jsonEncode(dayData);
     final file = await _getDayFile(_currentDate);
@@ -329,15 +354,14 @@ class _MyHomePageState extends State<MyHomePage> {
     try {
       final file = await _getDayFile(targetDate);
       if (await file.exists()){
-        final DateFormat formatter = DateFormat('yyyy-mm-dd');
+        final DateFormat formatter = DateFormat('yyyy-MM-dd');
         final contents = await file.readAsString();
         final Map<String, dynamic> dayData = jsonDecode(contents);
         setState(() {
           _markdownController.text = dayData['journal'];
           _currentDate = formatter.parse(dayData['date']);
-          _currentDateString = DateFormat('MMMM d, yyyy').format(_currentDate);
 
-          final dynamic taskData = jsonDecode(dayData['tasks']);
+          final List<dynamic> taskData = dayData['tasks'];
           List<Task> newTasks = taskData.map<Task>((task) => Task.fromJson(task)).toList();
           taskList = newTasks;
         });
@@ -351,9 +375,36 @@ class _MyHomePageState extends State<MyHomePage> {
       );
     }
   }
+  void loadCurrentDay() async {
+    final DateFormat formatter = DateFormat('yyyy-MM-dd');
+    try {
+      final file = await _getDayFile(_currentDate);
+      if (await file.exists()){
+        final contents = await file.readAsString();
+        final Map<String, dynamic> dayData = jsonDecode(contents);
+        setState(() {
+          _markdownController.text = dayData['journal'];
+          _currentDate = formatter.parse(dayData['date']);
+
+          final List<dynamic> taskData = dayData['tasks'];
+          List<Task> newTasks = taskData.map<Task>((task) => Task.fromJson(task)).toList();
+          taskList = newTasks;
+        });
+      } else {
+        loadPreviousDay();
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error decoding or reading JSON file: $e'),
+            duration: const Duration(milliseconds: 1500),
+          ),
+      );
+    }
+  }
 
   void loadPreviousDay() async {
-    final DateFormat formatter = DateFormat('yyyy-mm-dd');
+    final DateFormat formatter = DateFormat('yyyy-MM-dd');
     int daysPast = 1;
     try {
       var file = await _getDayFile(_currentDate.subtract(const Duration(days: 1)));
@@ -367,9 +418,8 @@ class _MyHomePageState extends State<MyHomePage> {
 
         setState(() {
           _currentDate = formatter.parse(dayData['date']);
-          _currentDateString = DateFormat('MMMM d, yyyy').format(_currentDate);
 
-          final dynamic taskData = jsonDecode(dayData['tasks']);
+          final List<dynamic> taskData = dayData['tasks'];
           List<Task> newTasks = taskData.map<Task>((task) => Task.fromJson(task)).toList();
           // drop tasks that have exceeded the current date
           for(int i=0; i < newTasks.length; i++){
@@ -381,7 +431,12 @@ class _MyHomePageState extends State<MyHomePage> {
         });
       }
     } catch (e) {
-
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error decoding or reading JSON file: $e'),
+          duration: const Duration(milliseconds: 1500),
+        ),
+      );
     }
   }
 }

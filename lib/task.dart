@@ -7,8 +7,16 @@ class Task extends StatefulWidget {
   final DateTime? date;
   final bool status;
   final Function(bool?)? checkboxCallback;
+  final VoidCallback? deleteCallback;
 
-  const Task({super.key, required this.name, this.date, required this.status, this.checkboxCallback});
+  const Task({
+    super.key,
+    required this.name,
+    this.date,
+    required this.status,
+    this.checkboxCallback,
+    this.deleteCallback,
+  });
 
   factory Task.fromJson(Map<String, dynamic> json) {
     final String name = json['name'] as String;
@@ -98,20 +106,26 @@ class _TaskState extends State<Task> {
           ),
           Expanded(
             flex: 1,
-            child: Padding(
-              padding: EdgeInsets.only(left: 20),
-              child: Transform.scale(
-                  scale: 1.25,
-                  child: Checkbox(
-                    value: status,
-                    onChanged: (bool? newValue) {
-                      setState(() {
-                        status = newValue ?? false;
-                      });
-                      checkboxCallback;
-                    },
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children:[
+                Transform.scale(
+                    scale: 1.25,
+                    child: Checkbox(
+                      value: status,
+                      onChanged: (bool? newValue) {
+                        setState(() {
+                          status = newValue ?? false;
+                        });
+                        checkboxCallback;
+                      },
+                  )
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete, color: Colors.red),
+                  onPressed: widget.deleteCallback,
                 )
-              )
+              ]
             )
           )
         ],
