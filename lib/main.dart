@@ -16,27 +16,11 @@ void main() {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: 'Daily App',
       theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
       home: MyHomePage(),
@@ -47,15 +31,6 @@ class MyApp extends StatelessWidget {
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key});
 
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
   @override
   State<MyHomePage> createState() => _MyHomePageState();
 }
@@ -63,8 +38,11 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   final DateTime dateToday = DateTime.now();
   final String dateTodayString = DateFormat('MMMM d, yyyy').format(DateTime.now());
-  String? _currentDate; // DateFormat('MMMM d, yyyy')
-  int _journalMode = 0;
+
+  DateTime _currentDate = DateTime.now(); // Used as a reference for the currently selected date
+  String _currentDateString = DateFormat('MMMM d, yyyy').format(DateTime.now());
+
+  int _journalMode = 0; // Toggle for journal mode (0 = editor, 1 = preview)
   bool editable = true; // Set to false if it's not the current day
 
   // ###################
@@ -85,6 +63,8 @@ class _MyHomePageState extends State<MyHomePage> {
   void initState() {
     super.initState();
     _markdownController.addListener(_updateContent);
+
+    // TaskList Initialization
   }
 
   void _updateContent() {
@@ -149,9 +129,13 @@ class _MyHomePageState extends State<MyHomePage> {
   void _onDayTapped(DateTime selectedDay, DateTime focusedDay) {
     setState(() {
       _selectedDay = selectedDay;
-      _focusedDay = focusedDay;
+      _focusedDay = selectedDay;
+      _currentDate = selectedDay;
+      _currentDateString = DateFormat('MMMM d, yyyy').format(selectedDay);
     });
-    _handleDaySelection(selectedDay);
+    saveDay();
+    loadDay(selectedDay);
+    _handleDaySelection(selectedDay); // unused
   }
 
   void _handleDaySelection(DateTime day) {
@@ -173,7 +157,7 @@ class _MyHomePageState extends State<MyHomePage> {
           appBar: AppBar(
             backgroundColor: Theme.of(context).colorScheme.inversePrimary,
             title: Center(
-                child: Text(_currentDate ?? DateFormat('MMMM d, yyyy').format(DateTime.now()))
+                child: Text(_currentDateString)
             ),
             bottom: const TabBar(
               tabs: [
@@ -294,18 +278,6 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
-  Future<String> get _localPath async {
-    final directory = await getApplicationDocumentsDirectory();
-    return directory.path;
-  }
-
-  Future<File> _getDayFile(DateTime date) async {
-    var day = DateFormat('yyyy-mm-dd').format(date);
-    // change _currentDate into yyyy-mm-dd,
-    final path = await _localPath;
-    return File('$path/$day.json');
-  }
-
   Widget _buildEditor() {
     return Container(
       padding: const EdgeInsets.all(16.0),
@@ -331,19 +303,86 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
+  Future<String> get _localPath async {
+    final directory = await getApplicationDocumentsDirectory();
+    return directory.path;
+  }
+
+  Future<File> _getDayFile(DateTime date) async {
+    var day = DateFormat('yyyy-mm-dd').format(date);
+    final path = await _localPath;
+    return File('$path/daily-$day.json');
+  }
+
   void saveDay() async {
     final Map<String, dynamic> dayData = {
       'journal': _markdownController.text,
       'tasks': taskList.map((task) => task.toJson()).toList(),
-      'date': _currentDate,
+      'date': DateFormat('yyyy-mm-dd').format(_currentDate),
     };
     String jsonString = jsonEncode(dayData);
-    final file = await _getDayFile(DateTime.now());
+    final file = await _getDayFile(_currentDate);
     await file.writeAsString(jsonString);
   }
 
-  void loadDay() async {
-    // using path provider, somehow.
+  void loadDay(DateTime targetDate) async {
+    try {
+      final file = await _getDayFile(targetDate);
+      if (await file.exists()){
+        final DateFormat formatter = DateFormat('yyyy-mm-dd');
+        final contents = await file.readAsString();
+        final Map<String, dynamic> dayData = jsonDecode(contents);
+        setState(() {
+          _markdownController.text = dayData['journal'];
+          _currentDate = formatter.parse(dayData['date']);
+          _currentDateString = DateFormat('MMMM d, yyyy').format(_currentDate);
+
+          final dynamic taskData = jsonDecode(dayData['tasks']);
+          List<Task> newTasks = taskData.map<Task>((task) => Task.fromJson(task)).toList();
+          taskList = newTasks;
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error decoding or reading JSON file: $e'),
+            duration: const Duration(milliseconds: 1500),
+          )
+      );
+    }
+  }
+
+  void loadPreviousDay() async {
+    final DateFormat formatter = DateFormat('yyyy-mm-dd');
+    int daysPast = 1;
+    try {
+      var file = await _getDayFile(_currentDate.subtract(const Duration(days: 1)));
+      while(file.existsSync() == false) {
+        file = await _getDayFile(_currentDate.subtract(Duration(days: daysPast)));
+        daysPast--;
+      }
+      if(await file.exists()){
+        final contents = await file.readAsString();
+        final Map<String, dynamic> dayData = jsonDecode(contents);
+
+        setState(() {
+          _currentDate = formatter.parse(dayData['date']);
+          _currentDateString = DateFormat('MMMM d, yyyy').format(_currentDate);
+
+          final dynamic taskData = jsonDecode(dayData['tasks']);
+          List<Task> newTasks = taskData.map<Task>((task) => Task.fromJson(task)).toList();
+          // drop tasks that have exceeded the current date
+          for(int i=0; i < newTasks.length; i++){
+            if(newTasks[i].date != null && newTasks[i].date!.isAfter(dateToday)){
+              newTasks.removeAt(i);
+            }
+          }
+          taskList = newTasks;
+        });
+      }
+    } catch (e) {
+
+    }
   }
 }
 
