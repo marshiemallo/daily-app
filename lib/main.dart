@@ -4,7 +4,6 @@ import 'package:intl/intl.dart';
 import 'package:markdown_widget/markdown_widget.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'dart:convert';
-import 'package:json_serializable/json_serializable.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 
@@ -61,7 +60,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     _markdownController.addListener(_updateContent);
-    WidgetsBinding.instance!.addObserver(this);
+    WidgetsBinding.instance.addObserver(this);
     loadCurrentDay();
   }
 
@@ -89,6 +88,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     setState((){
       _markdownContent = _markdownController.text;
     });
+    saveDay();
   }
 
   Widget _displayJournal() {
@@ -153,12 +153,17 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       _currentDate = DateTime(selectedDay.year, selectedDay.month, selectedDay.day);
     });
     final now = DateTime.now();
-    loadDay(_selectedDay);
+    if(_selectedDay.isAtSameMomentAs(dateToday)){
+      loadDay(_selectedDay);
+      // editable = true;
+    } else {
+      loadDay(_selectedDay);
+      // editable = false;
+    }
     _handleDaySelection(selectedDay); // unused
   }
 
   void _handleDaySelection(DateTime day) {
-
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Selected day: ${day.month}/${day.day}/${day.year}'),
@@ -226,17 +231,17 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                         }
                         setState(() {
                           taskList[num] = taskList[num].copyWith(
-                            status: checkboxState
+                            status: newState
                           );
                         });
+                        saveDay();
                       },
                       deleteCallback: () {
-                      setState(() {
                         setState(() {
-                          taskList.removeAt(index);
+                            taskList.removeAt(index);
                         });
-                      });
-                    }
+                        saveDay();
+                      }
                     );
                   },
                   separatorBuilder: (context,index) => const SizedBox(height:10),
@@ -253,6 +258,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                         taskList.add(newTask);
                       });
                     }
+                    saveDay();
                   },
                   tooltip: 'Add New Task',
                   child: Icon(Icons.add),
@@ -279,10 +285,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                       return isSameDay(_selectedDay, day);
                     },
 
-                    // **This is the main callback you need**
+                    // Main Callback Function
                     onDaySelected: _onDayTapped,
 
-                    // Optional: Custom styling for the selected day
                     calendarStyle: CalendarStyle(
                       selectedDecoration: BoxDecoration(
                         color: Theme.of(context).primaryColor,
@@ -365,6 +370,9 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           List<Task> newTasks = taskData.map<Task>((task) => Task.fromJson(task)).toList();
           taskList = newTasks;
         });
+      } else {
+        _markdownController.text = '';
+        taskList = [];
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -390,8 +398,10 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           List<Task> newTasks = taskData.map<Task>((task) => Task.fromJson(task)).toList();
           taskList = newTasks;
         });
+        saveDay();
       } else {
         loadPreviousDay();
+        saveDay();
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -408,27 +418,42 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     int daysPast = 1;
     try {
       var file = await _getDayFile(_currentDate.subtract(const Duration(days: 1)));
-      while(file.existsSync() == false) {
+      while(file.existsSync() == false && daysPast < 30) {
+        daysPast++;
         file = await _getDayFile(_currentDate.subtract(Duration(days: daysPast)));
-        daysPast--;
       }
       if(await file.exists()){
         final contents = await file.readAsString();
         final Map<String, dynamic> dayData = jsonDecode(contents);
 
         setState(() {
-          _currentDate = formatter.parse(dayData['date']);
-
           final List<dynamic> taskData = dayData['tasks'];
           List<Task> newTasks = taskData.map<Task>((task) => Task.fromJson(task)).toList();
-          // drop tasks that have exceeded the current date
-          for(int i=0; i < newTasks.length; i++){
-            if(newTasks[i].date != null && newTasks[i].date!.isAfter(dateToday)){
-              newTasks.removeAt(i);
+
+          newTasks.removeWhere((task) {
+            if(task.date == null) return false;
+
+            DateTime now = DateTime.now();
+            DateTime nowMidnight = DateTime(now.year, now.month, now.day);
+            DateTime taskMidnight = DateTime(task.date!.year, task.date!.month, task.date!.day);
+
+            return (taskMidnight.isBefore(nowMidnight) && !taskMidnight.isAtSameMomentAs(nowMidnight));
+          });
+
+          // reset Permanent tasks to false
+          for (var task in newTasks) {
+            if (task.date == null) {
+              int index = newTasks.indexOf(task);
+              newTasks[index] = task.copyWith(status: false);
             }
           }
+
           taskList = newTasks;
         });
+        saveDay();
+      } else {
+        _markdownController.text = '';
+        taskList = [];
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(

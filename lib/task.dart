@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:json_serializable/json_serializable.dart';
 
 class Task extends StatefulWidget {
   final String name;
@@ -31,8 +30,11 @@ class Task extends StatefulWidget {
     );
   }
 
-  Map<String, dynamic> toJson() => {'name': name, 'status': status, 'date': date};
-
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'status': status,
+    'date': date?.toIso8601String().substring(0,10)
+  };
 
   Task copyWith({String? name, bool? status, DateTime? date}){
     return Task(
@@ -48,26 +50,11 @@ class Task extends StatefulWidget {
 }
 
 class _TaskState extends State<Task> {
-  late String name;
-  late DateTime? date;
-  late bool status;
-  late Function(bool?)? checkboxCallback;
-
-  @override
-  void initState() {
-    super.initState();
-    name = widget.name;
-    date = widget.date;
-    status = widget.status;
-    checkboxCallback = widget.checkboxCallback;
-  }
 
   String _displayDate() {
-    if(date != null){
-      return DateFormat('Until MMMM d, yyyy').format(date ?? DateTime.now());
-      // technically it shouldn't ever get here while being null
-    }
-    return 'Permanent';
+    return widget.date == null
+      ? 'Permanent'
+      : DateFormat('Until MMMM d, yyyy').format(widget.date ?? DateTime.now());
   }
 
   @override
@@ -82,9 +69,7 @@ class _TaskState extends State<Task> {
       child: Row(
         mainAxisSize: MainAxisSize.max,
         children: [
-          Expanded(
-            flex: 2,
-            child: Padding(
+            Padding(
               padding: EdgeInsetsDirectional.fromSTEB(15, 10, 0, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -95,7 +80,7 @@ class _TaskState extends State<Task> {
                    style: TextStyle(fontWeight: FontWeight.normal),
                   ),
                   Text(
-                    name,
+                    widget.name,
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
                     overflow: TextOverflow.fade,
                     softWrap: false,
@@ -103,21 +88,17 @@ class _TaskState extends State<Task> {
                 ],
               ),
             ),
-          ),
+
           Expanded(
-            flex: 1,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children:[
                 Transform.scale(
                     scale: 1.25,
                     child: Checkbox(
-                      value: status,
+                      value: widget.status,
                       onChanged: (bool? newValue) {
-                        setState(() {
-                          status = newValue ?? false;
-                        });
-                        checkboxCallback;
+                        widget.checkboxCallback!(newValue);
                       },
                   )
                 ),
