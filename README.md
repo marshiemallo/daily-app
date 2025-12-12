@@ -11,7 +11,7 @@ A dedicated space to record your thoughts, reflections, and events of the day. E
 
 ### ✅ Smart To-Do List
 Manage your tasks with a system that understands how different responsibilities work:
-*   **Permanent Tasks:** Ideal for daily habits (e.g., "Drink Water", "Exercise"). These reset automatically every day, so you don't have to re-enter them.
+*   **Permanent Tasks:** Ideal for daily habits (e.g., "Draw for 30 minutes", "Exercise"). These reset automatically every day, so you don't have to re-enter them.
 *   **Scheduled Tasks:** Perfect for deadlines or short-term goals. These tasks persist on your daily list until their set completion date, ensuring they stay top-of-mind until finished.
 
 ### 🗓️ Calendar
